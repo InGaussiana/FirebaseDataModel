@@ -1,0 +1,52 @@
+import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import * as admin from 'firebase-admin';
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+
+function generateUniqueId () {
+    return dayjs().tz({{timezone}}).format('YYYY-MM-DD');
+}
+
+function flattenObj(obj, parent, res = {}) {
+    for(let key in obj){
+        let propName = parent ? parent + '.' + key : key;
+        if(typeof obj[key] == 'object'){
+            flattenObj(obj[key], propName, res);
+        } else {
+            res[propName] = obj[key];
+        }
+    }
+    return res;
+}
+
+{{#each tables}}
+exports.observate{{this.title}} = onDocumentUpdated(
+  '{{this.title}}/{docId}',
+  async ({ data, params }) => {
+    if (!data) return;
+
+    const before = flattenObj(data.before.data()) as {{this.title}}Type;
+    const after = flattenObj(data.after.data()) as {{this.title}}Type;
+
+    const variables = [{{#each this.attributes}}
+        {{#if this.required}}"{{this.name}}",{{/if}}
+    {{/each}}];
+
+      await admin
+      .firestore()
+      .doc(`{{this.title}}/${params.docId}/${generateUniqueId()}`)
+      .set({
+        before: Object.fromEntries(
+          variables.map((v) => [v, before[v] ?? null])
+        ),
+        after: Object.fromEntries(variables.map((v) => [v, after[v] ?? null])),
+        date: new Date(),
+    });
+});
+
+{{/each}}

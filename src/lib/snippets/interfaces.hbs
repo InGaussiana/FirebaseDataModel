@@ -1,0 +1,8 @@
+{{#each tables}}
+interface {{this.title}}Type {
+  {{#each this.attributes}}
+    {{this.name}}: {{this.type}};
+  {{/each}}
+}
+
+{{/each}}
